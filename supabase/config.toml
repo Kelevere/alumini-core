@@ -1,4 +1,4 @@
 project_id = "dmfiftavubxokcrjcxjy"
 
 [functions.alunos-api]
-verify_jwt = false
+verify_jwt = true

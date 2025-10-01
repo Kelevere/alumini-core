@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
 import { AlunoForm } from "@/components/AlunoForm";
 import { AlunosList } from "@/components/AlunosList";
 import { toast } from "sonner";
-import { GraduationCap, RefreshCw } from "lucide-react";
+import { GraduationCap, RefreshCw, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Aluno {
@@ -24,11 +26,22 @@ interface AlunoFormData {
 }
 
 const Index = () => {
+  const navigate = useNavigate();
+  const { user, session, loading: authLoading } = useAuth();
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingAluno, setEditingAluno] = useState<Aluno | null>(null);
 
+  // Redirecionar para login se não autenticado
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
   const fetchAlunos = async () => {
+    if (!session) return;
+
     try {
       setLoading(true);
       const { data, error } = await supabase.functions.invoke("alunos-api", {
@@ -51,8 +64,10 @@ const Index = () => {
   };
 
   useEffect(() => {
-    fetchAlunos();
-  }, []);
+    if (session) {
+      fetchAlunos();
+    }
+  }, [session]);
 
   const handleCreate = async (formData: AlunoFormData) => {
     try {
@@ -153,11 +168,56 @@ const Index = () => {
     setEditingAluno(null);
   };
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      toast.success("Logout realizado com sucesso!");
+      navigate("/auth");
+    } catch (error) {
+      toast.error("Erro ao fazer logout");
+    }
+  };
+
+  // Mostrar loading enquanto verifica autenticação
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-8 h-8 animate-spin mx-auto text-primary mb-4" />
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Não renderizar nada se não estiver autenticado (será redirecionado)
+  if (!user) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-primary/5">
       <div className="container mx-auto px-4 py-8 max-w-7xl">
         {/* Header */}
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 relative">
+          <div className="absolute top-0 right-0">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <User className="w-4 h-4" />
+                <span>{user.email}</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                className="hover:bg-destructive/10 hover:text-destructive hover:border-destructive transition-all"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Sair
+              </Button>
+            </div>
+          </div>
+          
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/80 mb-4">
             <GraduationCap className="w-8 h-8 text-primary-foreground" />
           </div>
@@ -165,7 +225,7 @@ const Index = () => {
             Sistema de Gestão de Alunos
           </h1>
           <p className="text-muted-foreground text-lg">
-            CRUD completo com Node.js + TypeScript + Supabase
+            CRUD completo com autenticação e segurança
           </p>
         </div>
 
